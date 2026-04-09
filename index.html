@@ -1,0 +1,1290 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+<title>WatchDog — Intelligent Change Detection</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"/>
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet"/>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#080c14;--bg2:#0e1420;--bg3:#141b2d;--bg4:#1a2235;
+  --border:#1e2d45;--border2:#243350;
+  --accent:#3b82f6;--accent2:#60a5fa;--accent-glow:rgba(59,130,246,.25);
+  --green:#10b981;--amber:#f59e0b;--red:#ef4444;--purple:#8b5cf6;
+  --text:#e8edf5;--text2:#8899b4;--text3:#4d607a;
+  --card:#0d1525;
+  --font-display:'Syne',sans-serif;--font-body:'DM Sans',sans-serif;
+  --radius:12px;--radius-lg:18px;--transition:.18s ease;
+}
+.light{
+  --bg:#f0f4fa;--bg2:#e8edf7;--bg3:#dde4f0;--bg4:#d0d9ed;
+  --border:#c8d4e8;--border2:#b8c8e0;
+  --card:#ffffff;--text:#1a2235;--text2:#4d607a;--text3:#8899b4;
+  --accent-glow:rgba(59,130,246,.12);
+}
+html{scroll-behavior:smooth}
+body{font-family:var(--font-body);background:var(--bg);color:var(--text);min-height:100vh;transition:background .3s,color .3s;overflow-x:hidden}
+
+/* Scrollbar */
+::-webkit-scrollbar{width:6px}::-webkit-scrollbar-track{background:var(--bg2)}::-webkit-scrollbar-thumb{background:var(--border2);border-radius:3px}
+
+/* ─── PAGE SYSTEM ─── */
+.page{display:none;min-height:100vh}
+.page.active{display:block}
+
+/* ─── NAV ─── */
+nav{position:fixed;top:0;left:0;right:0;z-index:100;height:60px;display:flex;align-items:center;justify-content:space-between;padding:0 28px;background:rgba(8,12,20,.88);backdrop-filter:blur(16px);border-bottom:1px solid var(--border)}
+.light nav{background:rgba(240,244,250,.9)}
+.nav-brand{font-family:var(--font-display);font-size:20px;font-weight:800;letter-spacing:-.5px;display:flex;align-items:center;gap:8px;cursor:pointer}
+.nav-brand span{color:var(--accent)}
+.brand-dot{width:8px;height:8px;background:var(--accent);border-radius:50%;box-shadow:0 0 10px var(--accent);animation:pulse 2s infinite}
+@keyframes pulse{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.6;transform:scale(1.3)}}
+.nav-links{display:flex;align-items:center;gap:4px}
+.nav-link{padding:7px 14px;border-radius:8px;font-size:13.5px;font-weight:500;cursor:pointer;transition:var(--transition);color:var(--text2);background:none;border:none;font-family:var(--font-body)}
+.nav-link:hover,.nav-link.active{background:var(--bg3);color:var(--text)}
+.nav-right{display:flex;align-items:center;gap:10px}
+.btn-sm{padding:7px 16px;border-radius:8px;font-size:13px;font-weight:500;cursor:pointer;transition:var(--transition);font-family:var(--font-body);border:none}
+.btn-outline{background:transparent;border:1px solid var(--border2);color:var(--text2)}
+.btn-outline:hover{border-color:var(--accent);color:var(--accent)}
+.btn-primary{background:var(--accent);color:#fff}
+.btn-primary:hover{background:var(--accent2);box-shadow:0 0 20px var(--accent-glow)}
+.theme-toggle{width:34px;height:34px;border-radius:8px;border:1px solid var(--border);background:var(--bg2);cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:15px;transition:var(--transition)}
+.theme-toggle:hover{border-color:var(--accent)}
+
+/* ─── SIDEBAR (dashboard pages) ─── */
+.app-layout{display:flex;padding-top:60px;min-height:100vh}
+.sidebar{width:220px;flex-shrink:0;background:var(--bg2);border-right:1px solid var(--border);padding:20px 12px;display:flex;flex-direction:column;gap:4px;position:fixed;top:60px;bottom:0;overflow-y:auto}
+.sidebar-item{display:flex;align-items:center;gap:10px;padding:9px 12px;border-radius:9px;cursor:pointer;font-size:13.5px;font-weight:500;color:var(--text2);transition:var(--transition);border:none;background:none;width:100%;font-family:var(--font-body);text-align:left}
+.sidebar-item:hover{background:var(--bg3);color:var(--text)}
+.sidebar-item.active{background:var(--accent-glow);color:var(--accent);border:1px solid rgba(59,130,246,.2)}
+.sidebar-icon{font-size:16px;width:20px;text-align:center}
+.sidebar-section{font-size:11px;font-weight:600;color:var(--text3);text-transform:uppercase;letter-spacing:.8px;padding:14px 12px 6px}
+.main-content{margin-left:220px;flex:1;padding:28px;max-width:1200px}
+
+/* ─── CARDS ─── */
+.card{background:var(--card);border:1px solid var(--border);border-radius:var(--radius-lg);padding:22px}
+.card-sm{padding:16px}
+.card:hover{border-color:var(--border2)}
+
+/* ─── STATS GRID ─── */
+.stats-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:16px;margin-bottom:24px}
+.stat-card{background:var(--card);border:1px solid var(--border);border-radius:var(--radius-lg);padding:20px;position:relative;overflow:hidden}
+.stat-card::before{content:'';position:absolute;top:-30px;right:-20px;width:80px;height:80px;border-radius:50%;opacity:.06}
+.stat-card.blue::before{background:var(--accent)}
+.stat-card.green::before{background:var(--green)}
+.stat-card.amber::before{background:var(--amber)}
+.stat-card.purple::before{background:var(--purple)}
+.stat-label{font-size:12px;color:var(--text2);font-weight:500;margin-bottom:8px}
+.stat-value{font-family:var(--font-display);font-size:28px;font-weight:700}
+.stat-value.blue{color:var(--accent)}
+.stat-value.green{color:var(--green)}
+.stat-value.amber{color:var(--amber)}
+.stat-value.purple{color:var(--purple)}
+.stat-sub{font-size:12px;color:var(--text3);margin-top:4px}
+
+/* ─── TABLE ─── */
+.table-wrap{overflow-x:auto}
+table{width:100%;border-collapse:collapse;font-size:13.5px}
+th{text-align:left;padding:10px 14px;font-size:11.5px;font-weight:600;color:var(--text3);text-transform:uppercase;letter-spacing:.6px;border-bottom:1px solid var(--border)}
+td{padding:12px 14px;border-bottom:1px solid var(--border);color:var(--text2);vertical-align:middle}
+tr:last-child td{border-bottom:none}
+tr:hover td{background:var(--bg3)}
+.td-main{color:var(--text);font-weight:500}
+
+/* ─── BADGES ─── */
+.badge{display:inline-flex;align-items:center;gap:5px;padding:3px 10px;border-radius:20px;font-size:11.5px;font-weight:600}
+.badge-green{background:rgba(16,185,129,.12);color:var(--green)}
+.badge-amber{background:rgba(245,158,11,.12);color:var(--amber)}
+.badge-red{background:rgba(239,68,68,.12);color:var(--red)}
+.badge-blue{background:rgba(59,130,246,.12);color:var(--accent2)}
+.badge-gray{background:var(--bg3);color:var(--text3)}
+.badge-dot{width:6px;height:6px;border-radius:50%;background:currentColor}
+
+/* ─── BUTTONS ─── */
+.btn{padding:9px 20px;border-radius:9px;font-size:13.5px;font-weight:500;cursor:pointer;transition:var(--transition);font-family:var(--font-body);border:none;display:inline-flex;align-items:center;gap:7px}
+.btn-blue{background:var(--accent);color:#fff}
+.btn-blue:hover{background:var(--accent2);box-shadow:0 0 24px var(--accent-glow)}
+.btn-ghost{background:var(--bg3);color:var(--text2);border:1px solid var(--border)}
+.btn-ghost:hover{color:var(--text);border-color:var(--border2)}
+.btn-danger{background:rgba(239,68,68,.15);color:var(--red);border:1px solid rgba(239,68,68,.2)}
+.btn-danger:hover{background:rgba(239,68,68,.25)}
+.btn-green{background:var(--green);color:#fff}
+.btn-green:hover{opacity:.88}
+
+/* ─── FORM ─── */
+.form-group{margin-bottom:16px}
+.form-label{display:block;font-size:13px;font-weight:500;color:var(--text2);margin-bottom:6px}
+.form-input{width:100%;padding:10px 14px;background:var(--bg3);border:1px solid var(--border);border-radius:9px;color:var(--text);font-size:14px;font-family:var(--font-body);outline:none;transition:var(--transition)}
+.form-input:focus{border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-glow)}
+.form-input::placeholder{color:var(--text3)}
+select.form-input{cursor:pointer}
+.form-row{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+.form-hint{font-size:12px;color:var(--text3);margin-top:5px}
+.form-check{display:flex;align-items:center;gap:8px;font-size:13.5px;color:var(--text2);cursor:pointer}
+.form-check input{accent-color:var(--accent);width:15px;height:15px}
+
+/* ─── MODAL ─── */
+.modal-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.7);backdrop-filter:blur(4px);z-index:200;align-items:center;justify-content:center}
+.modal-overlay.open{display:flex}
+.modal{background:var(--bg2);border:1px solid var(--border2);border-radius:var(--radius-lg);padding:28px;width:100%;max-width:520px;max-height:90vh;overflow-y:auto;animation:slideUp .2s ease}
+@keyframes slideUp{from{opacity:0;transform:translateY(20px)}to{opacity:1;transform:translateY(0)}}
+.modal-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:22px}
+.modal-title{font-family:var(--font-display);font-size:18px;font-weight:700}
+.modal-close{width:30px;height:30px;border-radius:7px;background:var(--bg3);border:none;color:var(--text2);cursor:pointer;font-size:16px;display:flex;align-items:center;justify-content:center;transition:var(--transition)}
+.modal-close:hover{background:var(--bg4);color:var(--text)}
+
+/* ─── TOAST ─── */
+#toast-container{position:fixed;bottom:24px;right:24px;z-index:999;display:flex;flex-direction:column;gap:8px}
+.toast{background:var(--bg2);border:1px solid var(--border2);border-radius:10px;padding:12px 18px;font-size:13.5px;font-weight:500;display:flex;align-items:center;gap:10px;animation:toastIn .25s ease;min-width:260px;max-width:360px}
+.toast.success{border-color:rgba(16,185,129,.4);color:var(--green)}
+.toast.error{border-color:rgba(239,68,68,.4);color:var(--red)}
+.toast.info{border-color:rgba(59,130,246,.4);color:var(--accent2)}
+@keyframes toastIn{from{opacity:0;transform:translateX(30px)}to{opacity:1;transform:translateX(0)}}
+
+/* ─── HOME PAGE ─── */
+.hero{min-height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:80px 24px 40px;position:relative;overflow:hidden}
+.hero-bg{position:absolute;inset:0;background:radial-gradient(ellipse 80% 60% at 50% 0%,rgba(59,130,246,.12),transparent),radial-gradient(ellipse 60% 40% at 80% 80%,rgba(139,92,246,.08),transparent);pointer-events:none}
+.hero-grid{position:absolute;inset:0;background-image:linear-gradient(var(--border) 1px,transparent 1px),linear-gradient(90deg,var(--border) 1px,transparent 1px);background-size:40px 40px;opacity:.3;pointer-events:none}
+.hero-eyebrow{display:inline-flex;align-items:center;gap:8px;background:rgba(59,130,246,.1);border:1px solid rgba(59,130,246,.25);border-radius:20px;padding:5px 14px;font-size:12.5px;font-weight:600;color:var(--accent2);margin-bottom:24px}
+.hero h1{font-family:var(--font-display);font-size:clamp(36px,6vw,72px);font-weight:800;line-height:1.05;letter-spacing:-2px;max-width:820px;margin-bottom:20px}
+.hero h1 .grad{background:linear-gradient(135deg,var(--accent),var(--purple));-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text}
+.hero-sub{font-size:18px;color:var(--text2);max-width:540px;line-height:1.6;margin-bottom:36px}
+.hero-btns{display:flex;gap:12px;flex-wrap:wrap;justify-content:center;margin-bottom:60px}
+.btn-hero{padding:13px 28px;border-radius:10px;font-size:15px;font-weight:500;cursor:pointer;transition:var(--transition);font-family:var(--font-body);border:none;display:inline-flex;align-items:center;gap:8px}
+.btn-hero-primary{background:var(--accent);color:#fff;box-shadow:0 4px 30px rgba(59,130,246,.35)}
+.btn-hero-primary:hover{background:var(--accent2);box-shadow:0 4px 40px rgba(59,130,246,.5);transform:translateY(-2px)}
+.btn-hero-secondary{background:var(--bg3);color:var(--text);border:1px solid var(--border2)}
+.btn-hero-secondary:hover{border-color:var(--accent2);color:var(--accent2);transform:translateY(-2px)}
+.features-section{padding:80px 24px;max-width:1100px;margin:0 auto;width:100%}
+.section-label{font-size:12px;font-weight:700;color:var(--accent);text-transform:uppercase;letter-spacing:1px;margin-bottom:10px}
+.section-title{font-family:var(--font-display);font-size:clamp(28px,4vw,42px);font-weight:800;letter-spacing:-1px;margin-bottom:12px}
+.section-sub{font-size:16px;color:var(--text2);max-width:540px;line-height:1.6;margin-bottom:48px}
+.features-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:20px}
+.feature-card{background:var(--card);border:1px solid var(--border);border-radius:var(--radius-lg);padding:24px;transition:var(--transition);position:relative;overflow:hidden}
+.feature-card:hover{border-color:var(--accent);transform:translateY(-3px);box-shadow:0 12px 40px rgba(0,0,0,.3)}
+.feature-icon{width:44px;height:44px;border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:20px;margin-bottom:14px}
+.feature-icon.blue{background:rgba(59,130,246,.15)}
+.feature-icon.green{background:rgba(16,185,129,.15)}
+.feature-icon.amber{background:rgba(245,158,11,.15)}
+.feature-icon.purple{background:rgba(139,92,246,.15)}
+.feature-icon.red{background:rgba(239,68,68,.15)}
+.feature-icon.teal{background:rgba(20,184,166,.15)}
+.feature-title{font-family:var(--font-display);font-size:16px;font-weight:700;margin-bottom:8px}
+.feature-desc{font-size:13.5px;color:var(--text2);line-height:1.6}
+.demo-strip{background:var(--bg2);border-top:1px solid var(--border);border-bottom:1px solid var(--border);padding:60px 24px;text-align:center}
+.demo-window{background:var(--bg3);border:1px solid var(--border2);border-radius:var(--radius-lg);max-width:760px;margin:32px auto 0;overflow:hidden;box-shadow:0 24px 80px rgba(0,0,0,.5)}
+.demo-titlebar{background:var(--bg4);padding:10px 16px;display:flex;align-items:center;gap:8px;border-bottom:1px solid var(--border)}
+.demo-dot{width:10px;height:10px;border-radius:50%}
+.demo-content{padding:20px;display:flex;flex-direction:column;gap:10px}
+.demo-row{display:flex;align-items:center;gap:12px;background:var(--card);border:1px solid var(--border);border-radius:9px;padding:12px 16px}
+.demo-url{font-family:monospace;font-size:13px;color:var(--accent2);flex:1}
+.footer-strip{padding:40px 24px;text-align:center;color:var(--text3);font-size:13px;border-top:1px solid var(--border)}
+
+/* ─── AUTH PAGE ─── */
+.auth-wrap{min-height:100vh;display:flex;align-items:center;justify-content:center;padding:80px 24px;background:var(--bg)}
+.auth-card{background:var(--card);border:1px solid var(--border);border-radius:20px;padding:36px;width:100%;max-width:420px}
+.auth-logo{text-align:center;margin-bottom:28px}
+.auth-logo h2{font-family:var(--font-display);font-size:24px;font-weight:800;margin-top:8px}
+.auth-logo p{font-size:13.5px;color:var(--text2);margin-top:6px}
+.auth-tabs{display:flex;background:var(--bg3);border-radius:9px;padding:3px;margin-bottom:24px}
+.auth-tab{flex:1;text-align:center;padding:8px;border-radius:7px;font-size:13.5px;font-weight:500;cursor:pointer;transition:var(--transition);color:var(--text2)}
+.auth-tab.active{background:var(--card);color:var(--text);box-shadow:0 1px 6px rgba(0,0,0,.2)}
+.auth-divider{text-align:center;position:relative;margin:18px 0;font-size:12px;color:var(--text3)}
+.auth-divider::before,.auth-divider::after{content:'';position:absolute;top:50%;width:42%;height:1px;background:var(--border)}
+.auth-divider::before{left:0}.auth-divider::after{right:0}
+.social-btn{width:100%;padding:10px;border:1px solid var(--border);border-radius:9px;background:var(--bg3);color:var(--text2);font-size:13.5px;cursor:pointer;font-family:var(--font-body);display:flex;align-items:center;justify-content:center;gap:8px;transition:var(--transition);margin-bottom:10px}
+.social-btn:hover{border-color:var(--accent);color:var(--accent)}
+.auth-footer{text-align:center;font-size:13px;color:var(--text2);margin-top:20px}
+.auth-footer a{color:var(--accent2);cursor:pointer;text-decoration:underline}
+
+/* ─── DASHBOARD ─── */
+.page-header{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:24px;flex-wrap:wrap;gap:12px}
+.page-title{font-family:var(--font-display);font-size:24px;font-weight:700}
+.page-subtitle{font-size:13.5px;color:var(--text2);margin-top:3px}
+.section-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:16px}
+.section-title-sm{font-family:var(--font-display);font-size:16px;font-weight:700}
+.chart-wrap{width:100%;height:180px;position:relative;margin-top:8px}
+.mini-bar-chart{display:flex;align-items:flex-end;gap:6px;height:100%;padding-bottom:4px}
+.bar-col{flex:1;display:flex;flex-direction:column;align-items:center;gap:4px}
+.bar{border-radius:4px 4px 0 0;transition:var(--transition);cursor:pointer;min-height:4px}
+.bar.blue{background:var(--accent);opacity:.7}
+.bar.blue:hover{opacity:1}
+.bar-label{font-size:10px;color:var(--text3)}
+.activity-list{display:flex;flex-direction:column;gap:12px}
+.activity-item{display:flex;align-items:flex-start;gap:12px}
+.activity-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0;margin-top:5px}
+.activity-text{font-size:13px;color:var(--text2);line-height:1.5}
+.activity-text strong{color:var(--text)}
+.activity-time{font-size:11.5px;color:var(--text3);margin-top:2px}
+.two-col{display:grid;grid-template-columns:1fr 1fr;gap:20px}
+@media(max-width:760px){.two-col{grid-template-columns:1fr}.form-row{grid-template-columns:1fr}.sidebar{width:180px}.main-content{margin-left:180px}}
+@media(max-width:600px){.sidebar{display:none}.main-content{margin-left:0}}
+
+/* ─── WEBSITE CARD ─── */
+.sites-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:16px}
+.site-card{background:var(--card);border:1px solid var(--border);border-radius:var(--radius-lg);padding:20px;transition:var(--transition)}
+.site-card:hover{border-color:var(--border2);transform:translateY(-2px);box-shadow:0 8px 30px rgba(0,0,0,.2)}
+.site-card-header{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:14px}
+.site-favicon{width:36px;height:36px;border-radius:8px;background:var(--bg3);display:flex;align-items:center;justify-content:center;font-size:18px}
+.site-actions{display:flex;gap:6px}
+.icon-btn{width:30px;height:30px;border-radius:7px;border:1px solid var(--border);background:var(--bg3);cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:13px;color:var(--text3);transition:var(--transition)}
+.icon-btn:hover{border-color:var(--border2);color:var(--text)}
+.icon-btn.danger:hover{border-color:var(--red);color:var(--red)}
+.site-name{font-weight:600;font-size:15px;color:var(--text);margin-bottom:3px}
+.site-url{font-size:12px;color:var(--text3);font-family:monospace;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:260px}
+.site-meta{display:flex;align-items:center;justify-content:space-between;margin-top:14px;padding-top:14px;border-top:1px solid var(--border)}
+.site-check{font-size:12px;color:var(--text3)}
+.progress-bar{width:100%;height:4px;background:var(--bg3);border-radius:2px;overflow:hidden;margin-top:10px}
+.progress-fill{height:100%;border-radius:2px;background:linear-gradient(90deg,var(--accent),var(--purple));transition:width .5s ease}
+
+/* ─── REPORTS ─── */
+.timeline{position:relative;padding-left:28px}
+.timeline::before{content:'';position:absolute;left:9px;top:0;bottom:0;width:2px;background:var(--border)}
+.timeline-item{position:relative;margin-bottom:24px}
+.timeline-item::before{content:'';position:absolute;left:-23px;top:4px;width:10px;height:10px;border-radius:50%;background:var(--accent);border:2px solid var(--bg);box-shadow:0 0 8px var(--accent)}
+.timeline-item.change::before{background:var(--amber)}
+.timeline-item.alert::before{background:var(--red)}
+.tl-time{font-size:11.5px;color:var(--text3);margin-bottom:4px}
+.tl-card{background:var(--card);border:1px solid var(--border);border-radius:10px;padding:14px 16px}
+.tl-title{font-size:14px;font-weight:600;color:var(--text);margin-bottom:4px}
+.tl-desc{font-size:13px;color:var(--text2);line-height:1.5}
+.diff-view{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:10px}
+.diff-before,.diff-after{padding:10px 12px;border-radius:8px;font-family:monospace;font-size:12px;line-height:1.6}
+.diff-before{background:rgba(239,68,68,.08);border:1px solid rgba(239,68,68,.2);color:var(--red)}
+.diff-after{background:rgba(16,185,129,.08);border:1px solid rgba(16,185,129,.2);color:var(--green)}
+
+/* ─── SETTINGS ─── */
+.settings-section{margin-bottom:32px}
+.settings-title{font-family:var(--font-display);font-size:15px;font-weight:700;margin-bottom:16px;padding-bottom:10px;border-bottom:1px solid var(--border)}
+.toggle-row{display:flex;justify-content:space-between;align-items:center;padding:12px 0;border-bottom:1px solid var(--border)}
+.toggle-row:last-child{border-bottom:none}
+.toggle-info h4{font-size:14px;font-weight:500;margin-bottom:2px}
+.toggle-info p{font-size:12.5px;color:var(--text2)}
+.toggle{width:44px;height:24px;background:var(--bg4);border-radius:12px;position:relative;cursor:pointer;transition:var(--transition);border:none;flex-shrink:0}
+.toggle.on{background:var(--accent)}
+.toggle::after{content:'';position:absolute;top:3px;left:3px;width:18px;height:18px;background:#fff;border-radius:50%;transition:var(--transition);box-shadow:0 1px 4px rgba(0,0,0,.2)}
+.toggle.on::after{left:23px}
+.avatar{width:60px;height:60px;border-radius:14px;background:linear-gradient(135deg,var(--accent),var(--purple));display:flex;align-items:center;justify-content:center;font-family:var(--font-display);font-size:22px;font-weight:700;color:#fff}
+
+/* ─── ADD SITE PAGE ─── */
+.add-site-wrap{max-width:680px}
+.step-indicator{display:flex;gap:0;margin-bottom:32px}
+.step{display:flex;align-items:center;flex:1}
+.step-circle{width:28px;height:28px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;border:2px solid var(--border);color:var(--text3);flex-shrink:0;transition:var(--transition)}
+.step.done .step-circle{background:var(--green);border-color:var(--green);color:#fff}
+.step.active .step-circle{background:var(--accent);border-color:var(--accent);color:#fff}
+.step-line{flex:1;height:2px;background:var(--border);margin:0 6px}
+.step-label{font-size:11.5px;font-weight:600;color:var(--text3);position:absolute;top:32px;transform:translateX(-50%)}
+.keyword-tag{display:inline-flex;align-items:center;gap:6px;background:var(--bg3);border:1px solid var(--border);border-radius:20px;padding:4px 10px;font-size:12.5px;color:var(--text2);margin:3px}
+.keyword-tag button{background:none;border:none;cursor:pointer;color:var(--text3);font-size:14px;line-height:1;display:flex}
+.freq-select{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
+.freq-option{padding:10px;border:1px solid var(--border);border-radius:9px;text-align:center;cursor:pointer;transition:var(--transition);font-size:13px;color:var(--text2)}
+.freq-option:hover{border-color:var(--accent2);color:var(--accent2)}
+.freq-option.selected{border-color:var(--accent);background:rgba(59,130,246,.08);color:var(--accent);font-weight:600}
+
+/* ─── LOADING SPINNER ─── */
+.spinner{width:20px;height:20px;border:2px solid var(--border2);border-top-color:var(--accent);border-radius:50%;animation:spin .6s linear infinite;display:inline-block}
+@keyframes spin{to{transform:rotate(360deg)}}
+
+/* ─── SEARCH BAR ─── */
+.search-bar{position:relative;flex:1;max-width:320px}
+.search-bar input{width:100%;padding:8px 14px 8px 36px;background:var(--bg3);border:1px solid var(--border);border-radius:9px;color:var(--text);font-size:13.5px;font-family:var(--font-body);outline:none;transition:var(--transition)}
+.search-bar input:focus{border-color:var(--accent)}
+.search-icon{position:absolute;left:11px;top:50%;transform:translateY(-50%);color:var(--text3);font-size:14px}
+
+/* ─── AI BADGE ─── */
+.ai-badge{display:inline-flex;align-items:center;gap:5px;background:linear-gradient(135deg,rgba(139,92,246,.15),rgba(59,130,246,.15));border:1px solid rgba(139,92,246,.3);border-radius:20px;padding:3px 10px;font-size:11.5px;font-weight:600;color:#a78bfa}
+
+/* ─── EMPTY STATE ─── */
+.empty-state{text-align:center;padding:60px 20px}
+.empty-icon{font-size:48px;margin-bottom:16px;opacity:.4}
+.empty-title{font-family:var(--font-display);font-size:18px;font-weight:700;margin-bottom:8px}
+.empty-desc{font-size:14px;color:var(--text2);max-width:300px;margin:0 auto 20px}
+
+/* ─── PLAN CARDS ─── */
+.plan-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:16px}
+.plan-card{background:var(--card);border:1px solid var(--border);border-radius:var(--radius-lg);padding:20px;text-align:center;transition:var(--transition)}
+.plan-card.recommended{border-color:var(--accent);background:rgba(59,130,246,.04)}
+.plan-name{font-family:var(--font-display);font-size:16px;font-weight:700;margin-bottom:6px}
+.plan-price{font-family:var(--font-display);font-size:30px;font-weight:800;color:var(--accent);margin:10px 0 4px}
+.plan-price span{font-size:14px;color:var(--text2);font-family:var(--font-body)}
+.plan-features{text-align:left;font-size:13px;color:var(--text2);line-height:2;margin:14px 0}
+.plan-feature::before{content:'✓  ';color:var(--green);font-weight:700}
+</style>
+</head>
+<body>
+
+<!-- ── NAV ── -->
+<nav id="main-nav">
+  <div class="nav-brand" onclick="showPage('home')">
+    <div class="brand-dot"></div>
+    <span>Watch</span>Dog
+  </div>
+  <div class="nav-links" id="nav-links-auth" style="display:none">
+    <button class="nav-link active" id="nav-dashboard" onclick="showApp('dashboard')">Dashboard</button>
+    <button class="nav-link" id="nav-sites" onclick="showApp('sites')">Websites</button>
+    <button class="nav-link" id="nav-reports" onclick="showApp('reports')">Reports</button>
+    <button class="nav-link" id="nav-settings" onclick="showApp('settings')">Settings</button>
+  </div>
+  <div class="nav-right">
+    <button class="theme-toggle" onclick="toggleTheme()">☀️</button>
+    <span id="nav-user-name" style="font-size:13.5px;color:var(--text2);display:none"></span>
+    <button class="btn-sm btn-outline" id="nav-login-btn" onclick="showPage('auth')">Log in</button>
+    <button class="btn-sm btn-primary" id="nav-signup-btn" onclick="showPage('auth')">Get started</button>
+    <button class="btn-sm btn-danger" id="nav-logout-btn" style="display:none" onclick="logout()">Log out</button>
+  </div>
+</nav>
+
+<!-- ════════════════════════════════════════ -->
+<!-- HOME PAGE -->
+<!-- ════════════════════════════════════════ -->
+<div class="page active" id="page-home">
+  <div class="hero">
+    <div class="hero-bg"></div>
+    <div class="hero-grid"></div>
+    <div style="position:relative">
+      <div class="hero-eyebrow">🤖 AI-Powered Monitoring</div>
+      <h1>Track Every Change.<br>Never Miss a <span class="grad">Critical Update.</span></h1>
+      <p class="hero-sub">Monitor any website automatically. Detect content changes, price drops, and keyword alerts — powered by intelligent AI summaries.</p>
+      <div class="hero-btns">
+        <button class="btn-hero btn-hero-primary" onclick="showPage('auth')">🚀 Start Free Monitoring</button>
+        <button class="btn-hero btn-hero-secondary" onclick="showPage('auth')">View Demo</button>
+      </div>
+      <div class="demo-window">
+        <div class="demo-titlebar">
+          <div class="demo-dot" style="background:#ef4444"></div>
+          <div class="demo-dot" style="background:#f59e0b"></div>
+          <div class="demo-dot" style="background:#10b981"></div>
+          <span style="font-size:12px;color:var(--text3);margin-left:10px">WatchDog Monitor</span>
+        </div>
+        <div class="demo-content">
+          <div class="demo-row">
+            <div class="site-favicon">🛍️</div>
+            <div style="flex:1"><div class="demo-url">amazon.com/dp/B09...</div><div style="font-size:11.5px;color:var(--text3)">Checked 2m ago</div></div>
+            <div class="badge badge-red"><div class="badge-dot"></div>Price Changed</div>
+          </div>
+          <div class="demo-row">
+            <div class="site-favicon">📰</div>
+            <div style="flex:1"><div class="demo-url">techcrunch.com/category...</div><div style="font-size:11.5px;color:var(--text3)">Checked 15m ago</div></div>
+            <div class="badge badge-amber"><div class="badge-dot"></div>New Content</div>
+          </div>
+          <div class="demo-row">
+            <div class="site-favicon">🏢</div>
+            <div style="flex:1"><div class="demo-url">competitor.com/pricing</div><div style="font-size:11.5px;color:var(--text3)">Checked 1h ago</div></div>
+            <div class="badge badge-green"><div class="badge-dot"></div>No Change</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="features-section">
+    <div style="text-align:center">
+      <div class="section-label">Core Features</div>
+      <h2 class="section-title">Everything you need to stay informed</h2>
+      <p class="section-sub" style="margin:0 auto 48px">From simple content change detection to AI-powered anomaly analysis — WatchDog has you covered.</p>
+    </div>
+    <div class="features-grid">
+      <div class="feature-card">
+        <div class="feature-icon blue">🔍</div>
+        <div class="feature-title">DOM Change Detection</div>
+        <div class="feature-desc">Compare HTML structure and text content between checks to pinpoint exactly what changed on any page.</div>
+      </div>
+      <div class="feature-card">
+        <div class="feature-icon green">💰</div>
+        <div class="feature-title">Price & Keyword Tracking</div>
+        <div class="feature-desc">Track price fluctuations and get alerts when specific keywords appear or disappear from monitored pages.</div>
+      </div>
+      <div class="feature-card">
+        <div class="feature-icon amber">🔔</div>
+        <div class="feature-title">Smart Alerts</div>
+        <div class="feature-desc">Email, Slack, and SMS notifications with intelligent filtering to reduce noise and only alert on real changes.</div>
+      </div>
+      <div class="feature-card">
+        <div class="feature-icon purple">🤖</div>
+        <div class="feature-title">AI Change Summaries</div>
+        <div class="feature-desc">Automatically generates plain-English summaries of what changed and why it might matter, powered by AI.</div>
+      </div>
+      <div class="feature-card">
+        <div class="feature-icon red">📊</div>
+        <div class="feature-title">Analytics & Reports</div>
+        <div class="feature-desc">Visual timelines, before/after comparisons, and exportable PDF/CSV reports for full audit trails.</div>
+      </div>
+      <div class="feature-card">
+        <div class="feature-icon teal">🛡️</div>
+        <div class="feature-title">Anomaly Detection</div>
+        <div class="feature-desc">ML-based detection of unusual patterns — identify when changes are abnormal vs regular updates.</div>
+      </div>
+    </div>
+  </div>
+  <div class="demo-strip">
+    <div class="section-label">Simple Pricing</div>
+    <h2 class="section-title" style="font-family:var(--font-display)">Start free. Scale when ready.</h2>
+    <div class="plan-grid" style="max-width:800px;margin:32px auto 0">
+      <div class="plan-card">
+        <div class="plan-name">Starter</div>
+        <div class="plan-price">$0<span>/mo</span></div>
+        <div class="plan-features">
+          <div class="plan-feature">5 websites</div>
+          <div class="plan-feature">Daily checks</div>
+          <div class="plan-feature">Email alerts</div>
+        </div>
+        <button class="btn btn-ghost" style="width:100%;justify-content:center" onclick="showPage('auth')">Get started</button>
+      </div>
+      <div class="plan-card recommended">
+        <div class="ai-badge" style="margin-bottom:8px">⭐ Most Popular</div>
+        <div class="plan-name">Pro</div>
+        <div class="plan-price">$19<span>/mo</span></div>
+        <div class="plan-features">
+          <div class="plan-feature">50 websites</div>
+          <div class="plan-feature">Hourly checks</div>
+          <div class="plan-feature">Slack + SMS alerts</div>
+          <div class="plan-feature">AI summaries</div>
+        </div>
+        <button class="btn btn-blue" style="width:100%;justify-content:center" onclick="showPage('auth')">Start Pro</button>
+      </div>
+      <div class="plan-card">
+        <div class="plan-name">Enterprise</div>
+        <div class="plan-price">$99<span>/mo</span></div>
+        <div class="plan-features">
+          <div class="plan-feature">Unlimited websites</div>
+          <div class="plan-feature">Minute-level checks</div>
+          <div class="plan-feature">Priority support</div>
+          <div class="plan-feature">Custom integrations</div>
+        </div>
+        <button class="btn btn-ghost" style="width:100%;justify-content:center" onclick="showPage('auth')">Contact us</button>
+      </div>
+    </div>
+  </div>
+  <div class="footer-strip">
+    Built with ❤️ · WatchDog © 2025 · <a href="#" style="color:var(--accent2)">Privacy</a> · <a href="#" style="color:var(--accent2)">Terms</a>
+  </div>
+</div>
+
+<!-- ════════════════════════════════════════ -->
+<!-- AUTH PAGE -->
+<!-- ════════════════════════════════════════ -->
+<div class="page" id="page-auth">
+  <div class="auth-wrap">
+    <div class="auth-card">
+      <div class="auth-logo">
+        <div style="font-size:32px">🐕</div>
+        <h2>WatchDog</h2>
+        <p id="auth-tagline">Monitor smarter, react faster</p>
+      </div>
+      <div class="auth-tabs">
+        <div class="auth-tab active" id="tab-login" onclick="switchAuthTab('login')">Log in</div>
+        <div class="auth-tab" id="tab-signup" onclick="switchAuthTab('signup')">Sign up</div>
+      </div>
+      <!-- Login Form -->
+      <div id="form-login">
+        <div class="form-group">
+          <label class="form-label">Email address</label>
+          <input class="form-input" type="email" id="login-email" placeholder="you@example.com"/>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Password</label>
+          <input class="form-input" type="password" id="login-password" placeholder="••••••••"/>
+        </div>
+        <button class="btn btn-blue" style="width:100%;justify-content:center;padding:12px" onclick="handleLogin()">Log in</button>
+        <div class="auth-divider">or continue with</div>
+        <button class="social-btn" onclick="handleDemoLogin()">🚀 Try Demo Account (no signup needed)</button>
+      </div>
+      <!-- Signup Form -->
+      <div id="form-signup" style="display:none">
+        <div class="form-row">
+          <div class="form-group">
+            <label class="form-label">First name</label>
+            <input class="form-input" type="text" id="signup-fname" placeholder="Alex"/>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Last name</label>
+            <input class="form-input" type="text" id="signup-lname" placeholder="Smith"/>
+          </div>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Email address</label>
+          <input class="form-input" type="email" id="signup-email" placeholder="you@example.com"/>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Password</label>
+          <input class="form-input" type="password" id="signup-password" placeholder="8+ characters"/>
+        </div>
+        <button class="btn btn-blue" style="width:100%;justify-content:center;padding:12px" onclick="handleSignup()">Create account</button>
+        <div class="auth-divider">or</div>
+        <button class="social-btn" onclick="handleDemoLogin()">🚀 Try Demo Account</button>
+      </div>
+      <div class="auth-footer">
+        <a onclick="showPage('home')">← Back to home</a>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ════════════════════════════════════════ -->
+<!-- APP PAGES (authenticated) -->
+<!-- ════════════════════════════════════════ -->
+<div class="page" id="page-app">
+  <div class="app-layout">
+    <!-- SIDEBAR -->
+    <div class="sidebar">
+      <button class="sidebar-item active" id="sb-dashboard" onclick="showApp('dashboard')">
+        <span class="sidebar-icon">📊</span> Dashboard
+      </button>
+      <button class="sidebar-item" id="sb-sites" onclick="showApp('sites')">
+        <span class="sidebar-icon">🌐</span> Websites
+      </button>
+      <button class="sidebar-item" id="sb-add" onclick="showApp('add')">
+        <span class="sidebar-icon">➕</span> Add Website
+      </button>
+      <div class="sidebar-section">Monitoring</div>
+      <button class="sidebar-item" id="sb-reports" onclick="showApp('reports')">
+        <span class="sidebar-icon">📋</span> Reports
+      </button>
+      <button class="sidebar-item" id="sb-alerts" onclick="showApp('alerts')">
+        <span class="sidebar-icon">🔔</span> Alerts
+        <span id="alert-badge" style="margin-left:auto;background:var(--red);color:#fff;font-size:10px;font-weight:700;padding:1px 6px;border-radius:10px">3</span>
+      </button>
+      <div class="sidebar-section">Account</div>
+      <button class="sidebar-item" id="sb-settings" onclick="showApp('settings')">
+        <span class="sidebar-icon">⚙️</span> Settings
+      </button>
+      <div style="margin-top:auto;padding-top:16px;border-top:1px solid var(--border)">
+        <div style="display:flex;align-items:center;gap:10px;padding:8px 12px">
+          <div style="width:32px;height:32px;border-radius:8px;background:linear-gradient(135deg,var(--accent),var(--purple));display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:700;color:#fff" id="sb-avatar">D</div>
+          <div style="min-width:0">
+            <div style="font-size:13px;font-weight:600;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis" id="sb-user">Demo User</div>
+            <div style="font-size:11px;color:var(--text3)">Pro Plan</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- MAIN CONTENT AREA -->
+    <div class="main-content">
+      <!-- ── DASHBOARD ── -->
+      <div id="app-dashboard">
+        <div class="page-header">
+          <div>
+            <div class="page-title">Dashboard</div>
+            <div class="page-subtitle">Overview of your monitoring activity</div>
+          </div>
+          <button class="btn btn-blue" onclick="showApp('add')">➕ Add Website</button>
+        </div>
+        <div class="stats-grid">
+          <div class="stat-card blue">
+            <div class="stat-label">Monitored Sites</div>
+            <div class="stat-value blue" id="stat-sites">0</div>
+            <div class="stat-sub">Active monitors</div>
+          </div>
+          <div class="stat-card amber">
+            <div class="stat-label">Changes Today</div>
+            <div class="stat-value amber" id="stat-changes">0</div>
+            <div class="stat-sub">Last 24 hours</div>
+          </div>
+          <div class="stat-card red">
+            <div class="stat-label">Pending Alerts</div>
+            <div class="stat-value" style="color:var(--red)" id="stat-alerts">3</div>
+            <div class="stat-sub">Unread notifications</div>
+          </div>
+          <div class="stat-card green">
+            <div class="stat-label">Uptime</div>
+            <div class="stat-value green">99.8%</div>
+            <div class="stat-sub">Last 30 days</div>
+          </div>
+        </div>
+        <div class="two-col">
+          <div class="card">
+            <div class="section-header">
+              <div class="section-title-sm">Change Frequency (7 days)</div>
+              <div class="ai-badge">AI</div>
+            </div>
+            <div class="mini-bar-chart" id="bar-chart"></div>
+          </div>
+          <div class="card">
+            <div class="section-header">
+              <div class="section-title-sm">Recent Activity</div>
+              <span style="font-size:12px;color:var(--accent2);cursor:pointer" onclick="showApp('reports')">View all →</span>
+            </div>
+            <div class="activity-list" id="activity-list"></div>
+          </div>
+        </div>
+        <div class="card" style="margin-top:20px">
+          <div class="section-header">
+            <div class="section-title-sm">Monitored Websites</div>
+            <button class="btn btn-ghost" onclick="showApp('sites')" style="font-size:12px;padding:6px 12px">Manage all →</button>
+          </div>
+          <div class="table-wrap">
+            <table id="dash-table">
+              <thead><tr><th>Website</th><th>Status</th><th>Last Check</th><th>Changes</th><th>Actions</th></tr></thead>
+              <tbody id="dash-table-body"></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- ── WEBSITES ── -->
+      <div id="app-sites" style="display:none">
+        <div class="page-header">
+          <div>
+            <div class="page-title">Monitored Websites</div>
+            <div class="page-subtitle" id="sites-count-text">Loading...</div>
+          </div>
+          <div style="display:flex;gap:10px;align-items:center">
+            <div class="search-bar">
+              <span class="search-icon">🔍</span>
+              <input placeholder="Search websites..." id="sites-search" oninput="filterSites()"/>
+            </div>
+            <button class="btn btn-blue" onclick="showApp('add')">➕ Add New</button>
+          </div>
+        </div>
+        <div class="sites-grid" id="sites-grid"></div>
+      </div>
+
+      <!-- ── ADD WEBSITE ── -->
+      <div id="app-add" style="display:none">
+        <div class="page-header">
+          <div>
+            <div class="page-title">Add Website</div>
+            <div class="page-subtitle">Configure a new monitoring target</div>
+          </div>
+        </div>
+        <div class="add-site-wrap">
+          <div class="card">
+            <div class="form-group">
+              <label class="form-label">Website URL *</label>
+              <input class="form-input" type="url" id="add-url" placeholder="https://example.com/page"/>
+              <div class="form-hint">Enter the full URL including https://</div>
+            </div>
+            <div class="form-group">
+              <label class="form-label">Display Name</label>
+              <input class="form-input" type="text" id="add-name" placeholder="My Competitor Site"/>
+            </div>
+            <div class="form-group">
+              <label class="form-label">Check Frequency</label>
+              <div class="freq-select" id="freq-select">
+                <div class="freq-option" onclick="selectFreq(this,'15min')">Every 15 min</div>
+                <div class="freq-option selected" onclick="selectFreq(this,'1hr')">Every Hour</div>
+                <div class="freq-option" onclick="selectFreq(this,'6hr')">Every 6 hrs</div>
+                <div class="freq-option" onclick="selectFreq(this,'daily')">Daily</div>
+                <div class="freq-option" onclick="selectFreq(this,'weekly')">Weekly</div>
+              </div>
+            </div>
+            <div class="form-group">
+              <label class="form-label">Detection Method</label>
+              <div style="display:flex;flex-direction:column;gap:10px;margin-top:4px">
+                <label class="form-check"><input type="checkbox" id="det-dom" checked/> DOM & Text comparison</label>
+                <label class="form-check"><input type="checkbox" id="det-visual"/> Visual pixel comparison</label>
+                <label class="form-check"><input type="checkbox" id="det-price" checked/> Price tracking</label>
+                <label class="form-check"><input type="checkbox" id="det-keyword"/> Keyword monitoring</label>
+              </div>
+            </div>
+            <div class="form-group" id="keyword-group">
+              <label class="form-label">Keywords to Track</label>
+              <div style="display:flex;gap:8px">
+                <input class="form-input" type="text" id="keyword-input" placeholder="Add keyword..." style="flex:1" onkeypress="if(event.key==='Enter')addKeyword()"/>
+                <button class="btn btn-ghost" onclick="addKeyword()">Add</button>
+              </div>
+              <div id="keywords-tags" style="margin-top:8px"></div>
+            </div>
+            <div class="form-group">
+              <label class="form-label">Alert Settings</label>
+              <div style="display:flex;flex-direction:column;gap:10px;margin-top:4px">
+                <label class="form-check"><input type="checkbox" id="alert-email" checked/> Email notifications</label>
+                <label class="form-check"><input type="checkbox" id="alert-slack"/> Slack notifications</label>
+                <label class="form-check"><input type="checkbox" id="alert-ai" checked/> AI-generated summaries</label>
+                <label class="form-check"><input type="checkbox" id="alert-noise" checked/> Filter noise (ads, timestamps)</label>
+              </div>
+            </div>
+            <div style="display:flex;gap:10px;margin-top:8px">
+              <button class="btn btn-blue" onclick="addSite()">🚀 Start Monitoring</button>
+              <button class="btn btn-ghost" onclick="showApp('sites')">Cancel</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ── REPORTS ── -->
+      <div id="app-reports" style="display:none">
+        <div class="page-header">
+          <div>
+            <div class="page-title">Reports</div>
+            <div class="page-subtitle">Change history and analytics</div>
+          </div>
+          <div style="display:flex;gap:10px">
+            <button class="btn btn-ghost" onclick="exportCSV()">📥 Export CSV</button>
+            <button class="btn btn-ghost" onclick="exportPDF()">📄 Export PDF</button>
+          </div>
+        </div>
+        <div class="two-col" style="margin-bottom:20px">
+          <div class="card">
+            <div class="section-title-sm" style="margin-bottom:16px">Change Summary</div>
+            <div style="display:flex;flex-direction:column;gap:10px">
+              <div style="display:flex;justify-content:space-between;align-items:center;padding:10px;background:var(--bg3);border-radius:9px">
+                <span style="font-size:13.5px;color:var(--text2)">Total changes detected</span>
+                <span style="font-family:var(--font-display);font-size:20px;font-weight:700;color:var(--accent)">47</span>
+              </div>
+              <div style="display:flex;justify-content:space-between;align-items:center;padding:10px;background:var(--bg3);border-radius:9px">
+                <span style="font-size:13.5px;color:var(--text2)">Price changes</span>
+                <span style="font-family:var(--font-display);font-size:20px;font-weight:700;color:var(--amber)">12</span>
+              </div>
+              <div style="display:flex;justify-content:space-between;align-items:center;padding:10px;background:var(--bg3);border-radius:9px">
+                <span style="font-size:13.5px;color:var(--text2)">Content changes</span>
+                <span style="font-family:var(--font-display);font-size:20px;font-weight:700;color:var(--green)">35</span>
+              </div>
+            </div>
+          </div>
+          <div class="card">
+            <div class="section-header" style="margin-bottom:12px">
+              <div class="section-title-sm">AI Anomaly Score</div>
+              <div class="ai-badge">🤖 AI</div>
+            </div>
+            <div style="text-align:center;padding:10px 0">
+              <div style="font-family:var(--font-display);font-size:52px;font-weight:800;color:var(--green)">Low</div>
+              <div style="font-size:13px;color:var(--text2);margin-top:6px">No unusual patterns detected in your monitored sites over the last 7 days. Changes appear to follow regular publishing cycles.</div>
+            </div>
+          </div>
+        </div>
+        <div class="card">
+          <div class="section-title-sm" style="margin-bottom:20px">Change Timeline</div>
+          <div class="timeline" id="timeline-list"></div>
+        </div>
+      </div>
+
+      <!-- ── ALERTS ── -->
+      <div id="app-alerts" style="display:none">
+        <div class="page-header">
+          <div>
+            <div class="page-title">Alerts</div>
+            <div class="page-subtitle">Recent change notifications</div>
+          </div>
+          <button class="btn btn-ghost" onclick="markAllRead()">✓ Mark all read</button>
+        </div>
+        <div class="card" id="alerts-list"></div>
+      </div>
+
+      <!-- ── SETTINGS ── -->
+      <div id="app-settings" style="display:none">
+        <div class="page-header">
+          <div>
+            <div class="page-title">Settings</div>
+            <div class="page-subtitle">Account and preferences</div>
+          </div>
+        </div>
+        <div style="max-width:600px">
+          <div class="card" style="margin-bottom:20px">
+            <div class="settings-title">Profile</div>
+            <div style="display:flex;align-items:center;gap:16px;margin-bottom:20px">
+              <div class="avatar" id="settings-avatar">D</div>
+              <div>
+                <div style="font-weight:600;font-size:15px" id="settings-name">Demo User</div>
+                <div style="font-size:13px;color:var(--text2)" id="settings-email">demo@watchdog.io</div>
+                <div class="badge badge-blue" style="margin-top:6px">Pro Plan</div>
+              </div>
+            </div>
+            <div class="form-row">
+              <div class="form-group">
+                <label class="form-label">Display Name</label>
+                <input class="form-input" id="set-name" value="Demo User"/>
+              </div>
+              <div class="form-group">
+                <label class="form-label">Email</label>
+                <input class="form-input" id="set-email" value="demo@watchdog.io"/>
+              </div>
+            </div>
+            <button class="btn btn-blue" onclick="saveSettings()">Save Changes</button>
+          </div>
+          <div class="card" style="margin-bottom:20px">
+            <div class="settings-title">Notifications</div>
+            <div class="toggle-row">
+              <div class="toggle-info"><h4>Email Alerts</h4><p>Receive notifications via email</p></div>
+              <button class="toggle on" onclick="this.classList.toggle('on')"></button>
+            </div>
+            <div class="toggle-row">
+              <div class="toggle-info"><h4>Slack Integration</h4><p>Send alerts to a Slack channel</p></div>
+              <button class="toggle" onclick="this.classList.toggle('on')"></button>
+            </div>
+            <div class="toggle-row">
+              <div class="toggle-info"><h4>SMS Notifications</h4><p>Critical alerts via SMS</p></div>
+              <button class="toggle" onclick="this.classList.toggle('on')"></button>
+            </div>
+            <div class="toggle-row">
+              <div class="toggle-info"><h4>AI Summaries</h4><p>Receive AI-generated change summaries</p></div>
+              <button class="toggle on" onclick="this.classList.toggle('on')"></button>
+            </div>
+            <div class="toggle-row">
+              <div class="toggle-info"><h4>Noise Filtering</h4><p>Ignore ads, timestamps, minor layout shifts</p></div>
+              <button class="toggle on" onclick="this.classList.toggle('on')"></button>
+            </div>
+          </div>
+          <div class="card">
+            <div class="settings-title">Integrations</div>
+            <div class="form-group">
+              <label class="form-label">Slack Webhook URL</label>
+              <input class="form-input" placeholder="https://hooks.slack.com/services/..."/>
+            </div>
+            <div class="form-group">
+              <label class="form-label">OpenAI API Key (for AI summaries)</label>
+              <input class="form-input" type="password" placeholder="sk-..."/>
+              <div class="form-hint">Used locally for AI-powered change summaries</div>
+            </div>
+            <div class="form-group">
+              <label class="form-label">Webhook URL (custom)</label>
+              <input class="form-input" placeholder="https://your-webhook.com/changes"/>
+            </div>
+            <button class="btn btn-blue" onclick="saveSettings()">Save Integrations</button>
+          </div>
+        </div>
+      </div>
+
+    </div><!-- /main-content -->
+  </div><!-- /app-layout -->
+</div><!-- /page-app -->
+
+<!-- ─── ADD SITE MODAL (quick) ─── -->
+<div class="modal-overlay" id="modal-check">
+  <div class="modal">
+    <div class="modal-header">
+      <div class="modal-title">🔍 Running Check...</div>
+      <button class="modal-close" onclick="closeModal('modal-check')">✕</button>
+    </div>
+    <div style="text-align:center;padding:20px">
+      <div class="spinner" style="width:40px;height:40px;margin:0 auto 16px;border-width:3px"></div>
+      <div style="font-size:14px;color:var(--text2)" id="check-status">Connecting to website...</div>
+      <div style="margin-top:16px;background:var(--bg3);border-radius:9px;padding:14px;text-align:left;font-size:13px;color:var(--text2);line-height:1.8;min-height:80px" id="check-log"></div>
+    </div>
+  </div>
+</div>
+
+<!-- ─── TOAST CONTAINER ─── -->
+<div id="toast-container"></div>
+
+<script>
+// ══════════════════════════════════════════════════════
+// APP STATE
+// ══════════════════════════════════════════════════════
+let currentUser = null;
+let appData = {
+  sites: [],
+  keywords: [],
+  selectedFreq: '1hr'
+};
+
+const DEMO_USER = { name:'Demo User', email:'demo@watchdog.io', initials:'DU' };
+
+const SAMPLE_SITES = [
+  { id:1, name:'Amazon Product', url:'https://amazon.com/dp/B09XR4KJPP', status:'changed', lastCheck:'2 min ago', changes:7, freq:'15min', emoji:'🛍️', score:82 },
+  { id:2, name:'TechCrunch Feed', url:'https://techcrunch.com/category/artificial-intelligence/', status:'changed', lastCheck:'18 min ago', changes:23, freq:'1hr', emoji:'📰', score:65 },
+  { id:3, name:'Competitor Pricing', url:'https://competitor.com/pricing', status:'ok', lastCheck:'1 hr ago', changes:2, freq:'daily', emoji:'🏢', score:45 },
+  { id:4, name:'GitHub Releases', url:'https://github.com/openai/openai-python/releases', status:'ok', lastCheck:'3 hrs ago', changes:5, freq:'6hr', emoji:'💻', score:90 },
+  { id:5, name:'HackerNews', url:'https://news.ycombinator.com', status:'checking', lastCheck:'Just now', changes:41, freq:'15min', emoji:'🧡', score:30 },
+];
+
+const SAMPLE_ACTIVITIES = [
+  { type:'change', text:'<strong>Amazon Product</strong> price dropped from $89.99 to $74.99', time:'2 minutes ago', dot:'var(--amber)' },
+  { type:'alert', text:'<strong>TechCrunch</strong> published 3 new articles matching your keywords', time:'18 minutes ago', dot:'var(--red)' },
+  { type:'ok', text:'<strong>GitHub Releases</strong> check completed — no changes detected', time:'3 hours ago', dot:'var(--green)' },
+  { type:'change', text:'<strong>Competitor Pricing</strong> page layout updated', time:'Yesterday, 4:32 PM', dot:'var(--accent)' },
+  { type:'ai', text:'AI Summary: HackerNews had 41 post changes — mostly comment counts', time:'Yesterday, 2:00 PM', dot:'var(--purple)' },
+];
+
+const SAMPLE_TIMELINE = [
+  { type:'change', time:'Today, 2:14 AM', title:'Price change detected — Amazon Product', desc:'Product price decreased from <strong>$89.99 → $74.99</strong>. AI Summary: This is likely a flash sale or promotional pricing. Recommend acting if purchase was planned.', before:'Price: $89.99\nRating: 4.5★\nIn Stock: Yes', after:'Price: $74.99 🔻\nRating: 4.5★\nIn Stock: Yes' },
+  { type:'change', time:'Yesterday, 6:45 PM', title:'New article published — TechCrunch AI', desc:'3 new articles added to the AI category feed. Keywords matched: "GPT-5", "Anthropic", "LLM"', before:'8 articles listed', after:'11 articles listed ✚3' },
+  { type:'alert', time:'Yesterday, 11:20 AM', title:'Anomaly detected — Competitor Pricing', desc:'AI flagged an unusual layout restructuring. The pricing table section was removed and replaced with a contact form — possible removal of self-serve tier.', before:null, after:null },
+  { type:'ok', time:'2 days ago, 3:00 PM', title:'Scheduled check — GitHub Releases', desc:'No changes detected. Last release remains v1.35.0. All monitored elements unchanged.', before:null, after:null },
+];
+
+const SAMPLE_ALERTS = [
+  { unread:true, icon:'🛍️', title:'Price drop alert', desc:'Amazon Product dropped by $15.00 (16% off)', time:'2 min ago', site:'Amazon Product' },
+  { unread:true, icon:'📰', title:'New content match', desc:'Keyword "GPT-5" found in 2 new TechCrunch articles', time:'18 min ago', site:'TechCrunch Feed' },
+  { unread:true, icon:'🏢', title:'Layout change', desc:'Competitor Pricing page structure changed significantly', time:'Yesterday', site:'Competitor Pricing' },
+  { unread:false, icon:'💻', title:'New release detected', desc:'openai-python v1.35.0 released on GitHub', time:'3 days ago', site:'GitHub Releases' },
+  { unread:false, icon:'🤖', title:'AI Summary ready', desc:'Weekly change summary generated for all 5 sites', time:'1 week ago', site:'All sites' },
+];
+
+// ══════════════════════════════════════════════════════
+// PAGE ROUTING
+// ══════════════════════════════════════════════════════
+function showPage(page) {
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  document.getElementById('page-' + page).classList.add('active');
+  window.scrollTo(0,0);
+
+  const isAuth = page === 'app';
+  document.getElementById('nav-links-auth').style.display = isAuth ? 'flex' : 'none';
+  document.getElementById('nav-login-btn').style.display = (currentUser || isAuth) ? 'none' : '';
+  document.getElementById('nav-signup-btn').style.display = (currentUser || isAuth) ? 'none' : '';
+  document.getElementById('nav-logout-btn').style.display = currentUser ? '' : 'none';
+  document.getElementById('nav-user-name').style.display = currentUser ? '' : 'none';
+  if(currentUser) document.getElementById('nav-user-name').textContent = currentUser.name;
+}
+
+function showApp(section) {
+  if(!currentUser){ showPage('auth'); return; }
+  showPage('app');
+  const sections = ['dashboard','sites','add','reports','alerts','settings'];
+  sections.forEach(s => {
+    const el = document.getElementById('app-'+s);
+    if(el) el.style.display = s===section ? '' : 'none';
+  });
+  document.querySelectorAll('.sidebar-item').forEach(el => el.classList.remove('active'));
+  const sb = document.getElementById('sb-'+section);
+  if(sb) sb.classList.add('active');
+  // Update nav links
+  ['dashboard','sites','reports','settings'].forEach(s => {
+    const nl = document.getElementById('nav-'+s);
+    if(nl) nl.classList.toggle('active', s===section);
+  });
+  if(section==='dashboard') renderDashboard();
+  if(section==='sites') renderSites();
+  if(section==='reports') renderReports();
+  if(section==='alerts') renderAlerts();
+}
+
+// ══════════════════════════════════════════════════════
+// AUTH
+// ══════════════════════════════════════════════════════
+function switchAuthTab(tab) {
+  document.getElementById('form-login').style.display = tab==='login' ? '' : 'none';
+  document.getElementById('form-signup').style.display = tab==='signup' ? '' : 'none';
+  document.getElementById('tab-login').classList.toggle('active', tab==='login');
+  document.getElementById('tab-signup').classList.toggle('active', tab==='signup');
+}
+
+function handleLogin() {
+  const email = document.getElementById('login-email').value;
+  const pass = document.getElementById('login-password').value;
+  if(!email || !pass){ showToast('Please fill in all fields','error'); return; }
+  loginAs({ name: email.split('@')[0], email, initials: email.substring(0,2).toUpperCase() });
+}
+
+function handleSignup() {
+  const fn = document.getElementById('signup-fname').value;
+  const ln = document.getElementById('signup-lname').value;
+  const email = document.getElementById('signup-email').value;
+  const pass = document.getElementById('signup-password').value;
+  if(!fn||!ln||!email||!pass){ showToast('Please fill in all fields','error'); return; }
+  if(pass.length < 6){ showToast('Password must be at least 6 characters','error'); return; }
+  loginAs({ name: fn+' '+ln, email, initials: (fn[0]+ln[0]).toUpperCase() });
+  showToast('Account created successfully! 🎉','success');
+}
+
+function handleDemoLogin() { loginAs(DEMO_USER); }
+
+function loginAs(user) {
+  currentUser = user;
+  appData.sites = [...SAMPLE_SITES];
+  document.getElementById('sb-user').textContent = user.name;
+  document.getElementById('sb-avatar').textContent = user.initials || user.name.substring(0,2).toUpperCase();
+  document.getElementById('settings-name').textContent = user.name;
+  document.getElementById('settings-email').textContent = user.email;
+  document.getElementById('settings-avatar').textContent = user.initials || user.name.substring(0,2).toUpperCase();
+  document.getElementById('set-name').value = user.name;
+  document.getElementById('set-email').value = user.email;
+  showToast('Welcome back, ' + user.name.split(' ')[0] + '! 👋','success');
+  showApp('dashboard');
+}
+
+function logout() {
+  currentUser = null;
+  showPage('home');
+  showToast('Logged out successfully','info');
+}
+
+// ══════════════════════════════════════════════════════
+// RENDER DASHBOARD
+// ══════════════════════════════════════════════════════
+function renderDashboard() {
+  document.getElementById('stat-sites').textContent = appData.sites.length;
+  const changes = appData.sites.filter(s=>s.status==='changed').length;
+  document.getElementById('stat-changes').textContent = changes;
+
+  // Bar chart
+  const bars = document.getElementById('bar-chart');
+  const days = ['Mon','Tue','Wed','Thu','Fri','Sat','Sun'];
+  const vals = [4,7,2,9,5,3,8];
+  const maxV = Math.max(...vals);
+  bars.innerHTML = days.map((d,i) => `
+    <div class="bar-col">
+      <div class="bar blue" style="width:100%;height:${Math.round((vals[i]/maxV)*140)}px" title="${vals[i]} changes"></div>
+      <div class="bar-label">${d}</div>
+    </div>`).join('');
+
+  // Activity
+  const actEl = document.getElementById('activity-list');
+  actEl.innerHTML = SAMPLE_ACTIVITIES.map(a => `
+    <div class="activity-item">
+      <div class="activity-dot" style="background:${a.dot}"></div>
+      <div><div class="activity-text">${a.text}</div><div class="activity-time">${a.time}</div></div>
+    </div>`).join('');
+
+  // Table
+  const tbody = document.getElementById('dash-table-body');
+  tbody.innerHTML = appData.sites.map(s => `
+    <tr>
+      <td><div style="display:flex;align-items:center;gap:10px"><span style="font-size:18px">${s.emoji}</span><div><div class="td-main">${s.name}</div><div style="font-size:11.5px;color:var(--text3);font-family:monospace">${s.url.substring(0,40)}...</div></div></div></td>
+      <td>${statusBadge(s.status)}</td>
+      <td style="font-size:13px">${s.lastCheck}</td>
+      <td><span style="font-family:var(--font-display);font-weight:700;color:var(--accent)">${s.changes}</span></td>
+      <td><div style="display:flex;gap:6px"><button class="btn btn-ghost" style="font-size:12px;padding:5px 10px" onclick="runCheck(${s.id})">Check now</button></div></td>
+    </tr>`).join('');
+}
+
+function statusBadge(status) {
+  if(status==='changed') return '<div class="badge badge-amber"><div class="badge-dot"></div>Changed</div>';
+  if(status==='ok') return '<div class="badge badge-green"><div class="badge-dot"></div>No change</div>';
+  if(status==='error') return '<div class="badge badge-red"><div class="badge-dot"></div>Error</div>';
+  return '<div class="badge badge-blue"><div class="badge-dot"></div>Checking</div>';
+}
+
+// ══════════════════════════════════════════════════════
+// RENDER SITES
+// ══════════════════════════════════════════════════════
+function renderSites(filter='') {
+  const list = filter ? appData.sites.filter(s=>s.name.toLowerCase().includes(filter)||s.url.toLowerCase().includes(filter)) : appData.sites;
+  document.getElementById('sites-count-text').textContent = `${list.length} website${list.length!==1?'s':''} monitored`;
+  const grid = document.getElementById('sites-grid');
+  if(!list.length){
+    grid.innerHTML = `<div class="empty-state" style="grid-column:1/-1"><div class="empty-icon">🌐</div><div class="empty-title">No websites yet</div><div class="empty-desc">Start monitoring by adding your first website</div><button class="btn btn-blue" onclick="showApp('add')">➕ Add Website</button></div>`;
+    return;
+  }
+  grid.innerHTML = list.map(s => `
+    <div class="site-card">
+      <div class="site-card-header">
+        <div class="site-favicon">${s.emoji}</div>
+        <div class="site-actions">
+          <button class="icon-btn" title="Check now" onclick="runCheck(${s.id})">🔄</button>
+          <button class="icon-btn danger" title="Delete" onclick="deleteSite(${s.id})">🗑</button>
+        </div>
+      </div>
+      <div class="site-name">${s.name}</div>
+      <div class="site-url">${s.url}</div>
+      <div class="progress-bar"><div class="progress-fill" style="width:${s.score}%"></div></div>
+      <div class="site-meta">
+        <div class="site-check">⏱ ${s.lastCheck}</div>
+        ${statusBadge(s.status)}
+      </div>
+    </div>`).join('');
+}
+
+function filterSites() {
+  const q = document.getElementById('sites-search').value.toLowerCase();
+  renderSites(q);
+}
+
+// ══════════════════════════════════════════════════════
+// RENDER REPORTS
+// ══════════════════════════════════════════════════════
+function renderReports() {
+  const tl = document.getElementById('timeline-list');
+  tl.innerHTML = SAMPLE_TIMELINE.map(item => `
+    <div class="timeline-item ${item.type}">
+      <div class="tl-time">${item.time}</div>
+      <div class="tl-card">
+        <div class="tl-title">${item.title}</div>
+        <div class="tl-desc">${item.desc}</div>
+        ${item.before ? `<div class="diff-view"><div class="diff-before"><div style="font-size:11px;font-weight:700;margin-bottom:6px;color:var(--red)">BEFORE</div>${item.before}</div><div class="diff-after"><div style="font-size:11px;font-weight:700;margin-bottom:6px;color:var(--green)">AFTER</div>${item.after}</div></div>` : ''}
+      </div>
+    </div>`).join('');
+}
+
+// ══════════════════════════════════════════════════════
+// RENDER ALERTS
+// ══════════════════════════════════════════════════════
+function renderAlerts() {
+  const el = document.getElementById('alerts-list');
+  el.innerHTML = SAMPLE_ALERTS.map((a,i) => `
+    <div style="display:flex;align-items:flex-start;gap:14px;padding:14px 0;border-bottom:1px solid var(--border);${i===SAMPLE_ALERTS.length-1?'border-bottom:none':''}">
+      ${a.unread ? '<div style="width:8px;height:8px;background:var(--accent);border-radius:50%;margin-top:6px;flex-shrink:0"></div>' : '<div style="width:8px;flex-shrink:0"></div>'}
+      <div style="font-size:20px">${a.icon}</div>
+      <div style="flex:1">
+        <div style="font-size:14px;font-weight:${a.unread?'600':'400'};color:var(--text);margin-bottom:3px">${a.title}</div>
+        <div style="font-size:13px;color:var(--text2)">${a.desc}</div>
+        <div style="font-size:11.5px;color:var(--text3);margin-top:4px">${a.site} · ${a.time}</div>
+      </div>
+      ${a.unread ? '<div class="badge badge-blue">New</div>' : ''}
+    </div>`).join('');
+}
+
+function markAllRead() {
+  SAMPLE_ALERTS.forEach(a => a.unread = false);
+  document.getElementById('alert-badge').style.display = 'none';
+  renderAlerts();
+  showToast('All alerts marked as read','success');
+}
+
+// ══════════════════════════════════════════════════════
+// ADD SITE
+// ══════════════════════════════════════════════════════
+function selectFreq(el, val) {
+  document.querySelectorAll('.freq-option').forEach(e => e.classList.remove('selected'));
+  el.classList.add('selected');
+  appData.selectedFreq = val;
+}
+
+function addKeyword() {
+  const input = document.getElementById('keyword-input');
+  const val = input.value.trim();
+  if(!val) return;
+  if(!appData.keywords.includes(val)) {
+    appData.keywords.push(val);
+    renderKeywords();
+  }
+  input.value = '';
+}
+
+function removeKeyword(kw) {
+  appData.keywords = appData.keywords.filter(k=>k!==kw);
+  renderKeywords();
+}
+
+function renderKeywords() {
+  document.getElementById('keywords-tags').innerHTML = appData.keywords.map(k =>
+    `<span class="keyword-tag">${k}<button onclick="removeKeyword('${k}')">×</button></span>`).join('');
+}
+
+function addSite() {
+  const url = document.getElementById('add-url').value.trim();
+  const name = document.getElementById('add-name').value.trim();
+  if(!url){ showToast('Please enter a URL','error'); return; }
+  if(!url.startsWith('http')){ showToast('URL must start with http:// or https://','error'); return; }
+
+  const displayName = name || (new URL(url).hostname);
+  const newSite = {
+    id: Date.now(),
+    name: displayName,
+    url,
+    status: 'checking',
+    lastCheck: 'Just now',
+    changes: 0,
+    freq: appData.selectedFreq,
+    emoji: '🌐',
+    score: 0
+  };
+  appData.sites.unshift(newSite);
+
+  // Reset form
+  document.getElementById('add-url').value = '';
+  document.getElementById('add-name').value = '';
+  appData.keywords = [];
+  renderKeywords();
+
+  showToast(`Now monitoring ${displayName} 🚀`, 'success');
+
+  // Simulate initial check
+  setTimeout(() => {
+    const site = appData.sites.find(s=>s.id===newSite.id);
+    if(site){ site.status='ok'; site.lastCheck='Just now'; }
+    showToast('Initial check complete — baseline saved', 'info');
+  }, 2500);
+
+  showApp('sites');
+}
+
+function deleteSite(id) {
+  appData.sites = appData.sites.filter(s=>s.id!==id);
+  renderSites();
+  showToast('Website removed from monitoring','info');
+  document.getElementById('stat-sites').textContent = appData.sites.length;
+}
+
+// ══════════════════════════════════════════════════════
+// RUN CHECK
+// ══════════════════════════════════════════════════════
+function runCheck(siteId) {
+  const site = appData.sites.find(s=>s.id===siteId);
+  if(!site) return;
+
+  openModal('modal-check');
+  const logEl = document.getElementById('check-log');
+  const statusEl = document.getElementById('check-status');
+
+  const steps = [
+    [300, 'Fetching HTML content...', '→ Connected to '+site.url.substring(0,35)+'...'],
+    [800, 'Parsing DOM structure...', '→ DOM parsed: 1,247 elements found'],
+    [1300, 'Comparing with baseline...', '→ Comparing against snapshot from '+site.lastCheck],
+    [1900, 'Running AI analysis...', '→ AI model analyzing semantic changes...'],
+    [2600, 'Check complete!', '→ ✓ Check complete. '+Math.floor(Math.random()*5)+' differences found.'],
+  ];
+
+  let log = '';
+  steps.forEach(([delay, status, logLine]) => {
+    setTimeout(() => {
+      statusEl.textContent = status;
+      log += logLine + '\n';
+      logEl.textContent = log;
+    }, delay);
+  });
+
+  setTimeout(() => {
+    closeModal('modal-check');
+    site.lastCheck = 'Just now';
+    site.status = Math.random() > 0.5 ? 'changed' : 'ok';
+    renderDashboard();
+    showToast(site.status==='changed' ? `⚠️ Changes detected on ${site.name}!` : `✓ ${site.name} — no changes`, site.status==='changed' ? 'error' : 'success');
+  }, 3000);
+}
+
+// ══════════════════════════════════════════════════════
+// SETTINGS
+// ══════════════════════════════════════════════════════
+function saveSettings() {
+  const name = document.getElementById('set-name').value;
+  const email = document.getElementById('set-email').value;
+  if(currentUser) { currentUser.name = name; currentUser.email = email; }
+  document.getElementById('settings-name').textContent = name;
+  document.getElementById('settings-email').textContent = email;
+  document.getElementById('sb-user').textContent = name;
+  document.getElementById('nav-user-name').textContent = name;
+  showToast('Settings saved successfully ✓','success');
+}
+
+// ══════════════════════════════════════════════════════
+// EXPORT
+// ══════════════════════════════════════════════════════
+function exportCSV() {
+  const rows = [['Website','URL','Status','Last Check','Changes']];
+  appData.sites.forEach(s => rows.push([s.name,s.url,s.status,s.lastCheck,s.changes]));
+  const csv = rows.map(r=>r.map(v=>'"'+v+'"').join(',')).join('\n');
+  const blob = new Blob([csv],{type:'text/csv'});
+  const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download='watchdog-report.csv'; a.click();
+  showToast('CSV exported successfully','success');
+}
+
+function exportPDF() { showToast('PDF export: Open print dialog (Ctrl+P) and save as PDF','info'); }
+
+// ══════════════════════════════════════════════════════
+// MODAL
+// ══════════════════════════════════════════════════════
+function openModal(id) { document.getElementById(id).classList.add('open'); }
+function closeModal(id) { document.getElementById(id).classList.remove('open'); }
+
+// ══════════════════════════════════════════════════════
+// TOAST
+// ══════════════════════════════════════════════════════
+function showToast(msg, type='info') {
+  const icons = { success:'✅', error:'❌', info:'ℹ️' };
+  const el = document.createElement('div');
+  el.className = `toast ${type}`;
+  el.innerHTML = `<span>${icons[type]}</span><span>${msg}</span>`;
+  document.getElementById('toast-container').appendChild(el);
+  setTimeout(()=>{ el.style.opacity='0'; el.style.transform='translateX(30px)'; el.style.transition='all .3s'; setTimeout(()=>el.remove(),300); }, 3500);
+}
+
+// ══════════════════════════════════════════════════════
+// THEME
+// ══════════════════════════════════════════════════════
+function toggleTheme() {
+  document.body.classList.toggle('light');
+  document.querySelector('.theme-toggle').textContent = document.body.classList.contains('light') ? '🌙' : '☀️';
+}
+
+// ══════════════════════════════════════════════════════
+// INIT
+// ══════════════════════════════════════════════════════
+showPage('home');
+</script>
+</body>
+</html>
